@@ -43,7 +43,7 @@ func NewMail() *Mail {
 func (m *Mail) Send(toEmails []string, subject string, body string) error {
 	address := fmt.Sprintf("%s:%s", m.host, m.port)
 	message := []byte(subject + body)
-	auth := smtp.CRAMMD5Auth(m.username, m.password)
+	auth := smtp.PlainAuth("", m.username, m.password, m.host)
 	err := smtp.SendMail(address, auth, m.from, toEmails, message)
 	return err
 }
