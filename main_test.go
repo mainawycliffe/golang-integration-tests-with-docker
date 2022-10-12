@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,17 +10,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	SMTP_HOST     = "localhost"
-	SMTP_PORT     string
-	HTTP_PORT     string
-	SMTP_USERNAME = ""
-	SMTP_PASSWORD = ""
+	SMTP_HOST = "localhost"
+	SMTP_PORT string
+	HTTP_PORT string
 )
 
 func TestMain(m *testing.M) {
@@ -36,13 +34,15 @@ func TestMain(m *testing.M) {
 	}
 
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	if err := pool.Retry(func() error {
+	err = pool.Retry(func() error {
 		SMTP_PORT = resource.GetPort("1025/tcp")
 		HTTP_PORT = resource.GetPort("8025/tcp")
 		// ping to ensure that the server is up and running
 		_, err := net.Dial("tcp", net.JoinHostPort("localhost", SMTP_PORT))
 		return err
-	}); err != nil {
+	})
+
+	if err != nil {
 		log.Fatalf("Could not connect to database: %s", err)
 	}
 
@@ -64,7 +64,7 @@ func TestMail_Send(t *testing.T) {
 		password: "",
 		username: "",
 	}
-	spew.Dump(mail)
+
 	err := mail.Send([]string{"to@example.com"}, "Test Subject", "Sending an automated test email")
 	assert.Nil(t, err)
 
@@ -79,8 +79,11 @@ func TestMail_Send(t *testing.T) {
 	body, err := ioutil.ReadAll(resp.Body)
 
 	assert.Nil(t, err)
-	spew.Dump(string(body))
 
-	// check whether the email was saved successfully
+	var bodyContent map[string][]map[string]map[string]interface{}
+	json.Unmarshal(body, &bodyContent)
+
+	mailBody := bodyContent["items"][0]["Content"]["Body"]
+	assert.Equal(t, "Test SubjectSending an automated test email", mailBody)
 
 }
